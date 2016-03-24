@@ -41,7 +41,6 @@ void cellcode() {
     //Block here until receive message from a squirrel
     MPI_Recv(&message, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 
-
     if (message == 0 || message == 1)
     {
       if (message == 0)

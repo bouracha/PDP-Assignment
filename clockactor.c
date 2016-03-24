@@ -27,7 +27,7 @@ void clockActor()
   {
     //function that delays before moving on. we have set it to 2 seconds
     //this allows the processors to move the squirrels for 2 seconds before resseting
-    sleep(3);
+    sleep(5);
 
     printf("\nSending monthly notice all cells \t Month %i\n\n", count);
     //MPI_Bcast(&month_changed, 1, MPI_INT, 0, MPI_COMM_WORLD);

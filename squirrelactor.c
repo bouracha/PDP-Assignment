@@ -52,7 +52,7 @@ while (workerStatus)
 
       // WE MAKE CELLNUMBER CORRESPOND TO MPI RANK 1-16 INCLUSIVE
       int cellnumber = getCellFromPosition(x, y);
-      cellnumber += 1;
+      cellnumber += 2;
 
       // Tell cell that squirrel has stepped into it and healthy or not
       MPI_Issend(&healthy, 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, &request1);
@@ -63,7 +63,6 @@ while (workerStatus)
       if (terminate == -3) break;
       MPI_Recv(&infection_level[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       MPI_Recv(&population_in_flux[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    
       // Calculate average infection level and average populationinflux for last 50 steps.
 
       float avg_inf_level = 0.0;
