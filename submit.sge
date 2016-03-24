@@ -1,0 +1,9 @@
+#!/bin/bash
+
+#$ -cwd -V
+#$ -pe mpi 20
+
+module load mpich2-pgi
+mpiexec -np 20 ./execute
+
+
