@@ -101,7 +101,6 @@ void cellcode() {
       //printf("Received terminate  %i from rank %i \n", terminate, parentId);
     if (message == -3) 
     {
-       printf("Cell received poison pill on rank %i. \n", rank);
        workerStatus=workerSleep();
     }
 

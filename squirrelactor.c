@@ -10,18 +10,22 @@
 
 
 void squirrelcode() {
-  //int workerStatus = 1;
-  int parentId;
-  float position[2];
-  long seed;
-  int healthy;
 
-  parentId = getCommandData();
+int parentId;
+float position[2];
+long seed;
+int healthy;
 
-  //Initialise MPI variables
-  int rank;     
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Request request1;
+parentId = getCommandData();
+
+//Initialise MPI variables
+int rank;     
+MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+MPI_Request request1;
+
+int workerStatus = 1;
+while (workerStatus)
+{
 
   /* Receive Squirrel position and random seed */
   MPI_Recv(&position[0], 2, MPI_FLOAT, parentId, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -39,88 +43,79 @@ void squirrelcode() {
   int infection_level [50] = {0};
   int population_in_flux [50] = {0};
 
-  int workerStatus = 1;
-  while (workerStatus)
-  {
-    squirrelStep(x, y, &x_new, &y_new, &seed);
-    x = x_new;
-    y = y_new;
 
-    // WE MAKE CELLNUMBER CORRESPOND TO MPI RANK 1-16 INCLUSIVE
-    int cellnumber = getCellFromPosition(x, y);
-    cellnumber += 1;
-
-    // Tell cell that squirrel has stepped into it and healthy or not
-    MPI_Issend(&healthy, 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, &request1);
-
-    int terminate = 0;
-    MPI_Recv(&terminate, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    if (terminate == -3)
+    while (1)
     {
-       printf("Squirrel received poison pill on rank %i. \n", rank);
-       break;
-    }
-    MPI_Recv(&infection_level[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //printf("Received 1!\n");
-    MPI_Recv(&population_in_flux[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    //printf("Received 2!\n");
-    //printf("Infection level: %f population in flux %f \n", infection_level[stepnumber], population_in_flux[stepnumber]);
-    MPI_Wait(&request1, MPI_STATUS_IGNORE);
+      squirrelStep(x, y, &x_new, &y_new, &seed);
+      x = x_new;
+      y = y_new;
+
+      // WE MAKE CELLNUMBER CORRESPOND TO MPI RANK 1-16 INCLUSIVE
+      int cellnumber = getCellFromPosition(x, y);
+      cellnumber += 1;
+
+      // Tell cell that squirrel has stepped into it and healthy or not
+      MPI_Issend(&healthy, 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, &request1);
+
+      // Check
+      int terminate = 0;
+      MPI_Recv(&terminate, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      if (terminate == -3) break;
+      MPI_Recv(&infection_level[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(&population_in_flux[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     
-    // Calculate average infection level and average populationinflux for last 50 steps.
+      // Calculate average infection level and average populationinflux for last 50 steps.
 
-    float avg_inf_level = 0.0;
-    float avg_pop = 0.0;
-    for (int i = 0; i < 50; i++)
-    {
-      avg_inf_level +=  infection_level [i];
-      avg_pop += population_in_flux [i];
-    }
-
-    avg_inf_level /= 50;
-    avg_pop /= 50;
-
-    if(willGiveBirth(avg_pop, &seed) && stepnumber == 49)
-    {
-      printf("Will give birth \n");
-      int baby_squirrel = 1;
-      MPI_Ssend(&baby_squirrel, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
-      float position [2] = {x, y};
-      MPI_Ssend(&position[0], 2, MPI_FLOAT, parentId, 0 , MPI_COMM_WORLD);
-      printf("Squirrel gave BIRTH at position  %lf, %lf \n", x, y);
-    }
-
-    // Healthy = 0 means squirrel has disease
-    if (willCatchDisease(avg_inf_level, &seed)) 
-    {
-      healthy = 0;
-      MPI_Ssend(&healthy, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
-
-    }
-    if (healthy == 0)
-    {
-      death_clock ++;   
-    }
-
-   //printf("Squirrel %i: stepnumber %i avg_pop: %f avg_inf_level %f \n", rank-17, stepnumber, avg_pop, avg_inf_level);
-
-    if (death_clock >= 50)
-    {
-      //printf("Squirrel is now dying.\n");
-      if (willDie(&seed))
+      float avg_inf_level = 0.0;
+      float avg_pop = 0.0;
+      for (int i = 0; i < 50; i++)
       {
-        printf("Squirrel died at position  %lf, %lf after %i infected steps\n", x, y, death_clock%50);
-        // Tell master process squirrel has died 
-        int die_message = - 1;
-        MPI_Ssend(&die_message, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
-        
-        break;
+        avg_inf_level +=  infection_level [i];
+        avg_pop += population_in_flux [i];
       }
+
+      avg_inf_level /= 50;
+      avg_pop /= 50;
+
+      if(willGiveBirth(avg_pop, &seed) && stepnumber == 49)
+      {
+        int baby_squirrel = 1;
+        MPI_Ssend(&baby_squirrel, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
+        float position [2] = {x, y};
+        MPI_Ssend(&position[0], 2, MPI_FLOAT, parentId, 0 , MPI_COMM_WORLD);
+      }
+
+      // Healthy = 0 means squirrel has disease
+      if (willCatchDisease(avg_inf_level, &seed)) 
+      {
+        healthy = 0;
+        MPI_Ssend(&healthy, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
+      }
+      if (healthy == 0)
+      {
+        death_clock ++;   
+      }
+
+     //printf("Squirrel %i: stepnumber %i avg_pop: %f avg_inf_level %f \n", rank-17, stepnumber, avg_pop, avg_inf_level);
+
+      if (death_clock >= 50)
+      {
+        //printf("Squirrel is now dying.\n");
+        if (willDie(&seed))
+        {
+          // Tell master process squirrel has died 
+          int die_message = - 1;
+          MPI_Ssend(&die_message, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
+        
+          break;
+        }
+      }
+
+      stepnumber++;
+      stepnumber = stepnumber%50;
     }
-
-    stepnumber++;
-    stepnumber = stepnumber%50;
-  }
-
-    workerStatus=workerSleep(); // Will sleep until a new task or shutdown
+  printf("Worker is going to sleep\n");
+  workerStatus=workerSleep(); // Will sleep until a new task or shutdown
+  printf("Worker has woken up again\n");
+} 
 }

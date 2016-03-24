@@ -4,6 +4,7 @@
 #include "squirrel-functions.h"
 #include "squirrelactor.h"
 #include "cellactor.h"
+#include "clockactor.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,7 +16,6 @@
 
 static int InitialiseCell();
 static void InitialiseSquirrel(float, float, long*, int);
-void clockActor();
 
 int main(int argc, char * argv[]) 
 {
@@ -26,6 +26,9 @@ int main(int argc, char * argv[])
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Request request1;
+
+  int flag;
+  int max_pop = 40;
 
   //Initialise Random Seed, different on each process
   long seed = -1-rank;
@@ -56,10 +59,8 @@ int main(int argc, char * argv[])
       startWorkerProcess();
     }
 
-
-
     int healthysquirrels = 0;
-    for (int i = 0; i < 15; i++)
+    for (int i = 0; i < 10; i++)
     {
       int healthy = 1;
       float x, y = 0;
@@ -70,7 +71,7 @@ int main(int argc, char * argv[])
     }
 
     int diseasedsquirrels = 0;
-    for (int i = 0; i < 0; i++)
+    for (int i = 0; i < 20; i++)
     {
       int healthy = 0;
       float x, y = 0;
@@ -90,7 +91,7 @@ int main(int argc, char * argv[])
       if (squirrel_health == -1) 
       {
         diseasedsquirrels--;
-        printf("squirrel has died on process %d leaving %d squirrels\n", status.MPI_SOURCE, (healthysquirrels+diseasedsquirrels));
+        printf("Squirrel has DIED on process %d leaving %d squirrels\n", status.MPI_SOURCE, (healthysquirrels+diseasedsquirrels));
       }
       // If new squirrel_health was born start new worker process
       if (squirrel_health == 1)
@@ -102,6 +103,7 @@ int main(int argc, char * argv[])
         int healthy = 1;
         InitialiseSquirrel(x, y, &seed, healthy);
         healthysquirrels++;
+        printf("\nSquirrel been BORN on process %d now there's %d squirrels\n", status.MPI_SOURCE, (healthysquirrels+diseasedsquirrels));
       }
       if (squirrel_health == 0)
       {
@@ -109,24 +111,25 @@ int main(int argc, char * argv[])
         diseasedsquirrels++;
       }
       
+      //MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
+      //if (flag) MPI_Recv(&terminate, 1, MPI_INT, 17, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
       int Num_squirrels = 0;
       Num_squirrels = healthysquirrels + diseasedsquirrels;
-      if (Num_squirrels <= 0 || Num_squirrels >= 20) 
+      if (Num_squirrels <= 0 || Num_squirrels >= max_pop || terminate == -3) 
       {
+        if(Num_squirrels == 0) printf("\n\nAll Squirrels have died, exiting program.\n\n");
+        if(Num_squirrels >= max_pop) printf("\n\nToo many squirrels for environment.\n\n");
         int poisonedpill = -3;
         //MPI_Bcast(&poisonedpill, 1, MPI_INT, 0, MPI_COMM_WORLD);
         for (int i = 1; i < (18+Num_squirrels); i++)
         {
-if (i == 17) printf("sending to clock\n");
           MPI_Issend(&poisonedpill, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &request1);
-if (i == 17) printf("clock received\n");
         }
-        terminate = 1;
+        terminate = -3;
       }
 
-      //masterStatus=masterPoll();
-      /* Break loop if all squirrels are dead */
-      if (terminate) break;
+      if (terminate == -3) break;
     }
 
   }
@@ -149,59 +152,13 @@ void InitialiseSquirrel(float  x, float  y, long * seed, int healthy)
 {
   int workerPid = startWorkerProcess();
 
-  printf("Worker with workerid %i has made a squirrel_health at position: %f, %f\n", workerPid, x, y);
+  //printf("Worker with workerid %i has made a squirrel_health at position: %f, %f\n", workerPid, x, y);
 
   /* Master sends information on new squirrel_health to squirrel_health worker code */
   float position [2] = {x, y};
   MPI_Ssend(&position[0], 2, MPI_FLOAT, workerPid, 0 , MPI_COMM_WORLD);
   MPI_Ssend(seed, 1, MPI_LONG, workerPid, 0 , MPI_COMM_WORLD);
   MPI_Ssend(&healthy, 1, MPI_INT, workerPid, 0 , MPI_COMM_WORLD);
-}
-
-
-
-
-void clockActor()
-{
-  MPI_Request request1;
-  MPI_Request request2;
-  int months = 24;
-  int count = 0;
-  int terminate = 0;
-  int month_changed = 2;
-
-  int flag = 0;
-
-  int parentId; 
-  parentId = getCommandData();
-
-  int workerStatus = 1;	
-  while(count < months)
-  {
-    //function that delays before moving on. we have set it to 2 seconds
-    //this allows the processors to move the squirrels for 2 seconds before resseting
-    sleep(5);
-
-    printf("\nSending monthly notice all cells \t Month %i\n\n", count);
-    //MPI_Bcast(&month_changed, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    for (int i = 1; i < 17; i++)
-    {
-      MPI_Issend(&month_changed, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &request1);
-    }
-
-    MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
-    if (flag) MPI_Recv(&terminate, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    count++;
-      
-    if (terminate == -3)
-    {
-      break;
-    }
-  }
-  
-  printf("Clock sleeping\n");
-  workerStatus=workerSleep();
 }
 
 
