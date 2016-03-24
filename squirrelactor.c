@@ -21,6 +21,7 @@ void squirrelcode() {
   //Initialise MPI variables
   int rank;     
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Request request1;
 
   /* Receive Squirrel position and random seed */
   MPI_Recv(&position[0], 2, MPI_FLOAT, parentId, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -35,8 +36,8 @@ void squirrelcode() {
   int stepnumber = 0;
   int death_clock = 0;
 
-  float infection_level [50] = {0};
-  float population_in_flux [50] = {0};
+  int infection_level [50] = {0};
+  int population_in_flux [50] = {0};
 
   int workerStatus = 1;
   while (workerStatus)
@@ -50,23 +51,32 @@ void squirrelcode() {
     cellnumber += 1;
 
     // Tell cell that squirrel has stepped into it and healthy or not
-    MPI_Ssend(&healthy, 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD);
+    MPI_Issend(&healthy, 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, &request1);
 
-
-    MPI_Recv(&infection_level[stepnumber], 1, MPI_FLOAT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    int terminate = 0;
+    MPI_Recv(&terminate, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    if (terminate == -3)
+    {
+       printf("Squirrel received poison pill on rank %i. \n", rank);
+       break;
+    }
+    MPI_Recv(&infection_level[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     //printf("Received 1!\n");
-    MPI_Recv(&population_in_flux[stepnumber], 1, MPI_FLOAT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(&population_in_flux[stepnumber], 1, MPI_INT, cellnumber, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     //printf("Received 2!\n");
     //printf("Infection level: %f population in flux %f \n", infection_level[stepnumber], population_in_flux[stepnumber]);
+    MPI_Wait(&request1, MPI_STATUS_IGNORE);
     
     // Calculate average infection level and average populationinflux for last 50 steps.
-    float avg_inf_level = 0;
-    float avg_pop = 0;
+
+    float avg_inf_level = 0.0;
+    float avg_pop = 0.0;
     for (int i = 0; i < 50; i++)
     {
       avg_inf_level +=  infection_level [i];
       avg_pop += population_in_flux [i];
     }
+
     avg_inf_level /= 50;
     avg_pop /= 50;
 
@@ -77,11 +87,16 @@ void squirrelcode() {
       MPI_Ssend(&baby_squirrel, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
       float position [2] = {x, y};
       MPI_Ssend(&position[0], 2, MPI_FLOAT, parentId, 0 , MPI_COMM_WORLD);
-      printf("Squirrel gave BIRTH at position  %lf, %lf after %i steps\n", x, y, stepnumber);
+      printf("Squirrel gave BIRTH at position  %lf, %lf \n", x, y);
     }
 
     // Healthy = 0 means squirrel has disease
-    if (willCatchDisease(avg_inf_level, &seed)) healthy = 0;
+    if (willCatchDisease(avg_inf_level, &seed)) 
+    {
+      healthy = 0;
+      MPI_Ssend(&healthy, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
+
+    }
     if (healthy == 0)
     {
       death_clock ++;   
@@ -99,8 +114,7 @@ void squirrelcode() {
         int die_message = - 1;
         MPI_Ssend(&die_message, 1, MPI_INT, parentId, 0, MPI_COMM_WORLD); 
         
-        workerStatus=workerSleep();
-        //break;
+        break;
       }
     }
 
@@ -108,5 +122,5 @@ void squirrelcode() {
     stepnumber = stepnumber%50;
   }
 
-    //workerStatus=workerSleep(); // Will sleep until a new task or shutdown
+    workerStatus=workerSleep(); // Will sleep until a new task or shutdown
 }

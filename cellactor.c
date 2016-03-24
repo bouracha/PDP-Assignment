@@ -12,7 +12,6 @@
 void cellcode() {
 
   int parentId; 
-
   parentId = getCommandData();
 
   float infection_level [2] = {0};
@@ -21,72 +20,94 @@ void cellcode() {
   int infection_month_number = 0;
   int population_month_number = 0;
 
-  float num_infected_squirrels = 0.0;
-  float population = 0.0;
+  int num_infected_squirrels = 0;
+  int population = 0;
 
   int terminate = 0;
-  int healthy;
+  int message;
 
   //Initialise MPI variables
   int rank;     
   MPI_Status status;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Request request;
+  MPI_Request request1;
+  MPI_Request request2;
+  MPI_Request request3;
 
   int workerStatus = 1;
   while (workerStatus)
   {
 
     //Block here until receive message from a squirrel
-    MPI_Recv(&healthy, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+    MPI_Recv(&message, 1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 
-    int month_changed = 0;
-    MPI_Irecv(&month_changed, 1, MPI_INT, 17, 1, MPI_COMM_WORLD, &request);
-    if(month_changed == 1)
+
+    if (message == 0 || message == 1)
+    {
+      if (message == 0)
+      {
+        infection_level [(infection_month_number)] += 1;
+      }
+      population_in_flux [(population_month_number)] += 1;
+
+      num_infected_squirrels = 0;
+      for (int i = 0; i < 2; i++)
+      {
+        num_infected_squirrels +=  infection_level [i];
+      }
+
+      population = 0;
+      for (int i = 0; i < 3; i++)
+      {
+        population +=  population_in_flux [i];
+      }
+      population -= 1; //Squirrel doesn't copulate with itself
+
+      //printf("popinflux %f in cell: %i \n",population, rank);
+      //printf("infection_level %f, population_in_flux %f\n", infection_level [(infection_month_number)], population_in_flux [0], status.MPI_SOURCE);
+
+      // Send information back to the squirrel.
+      MPI_Issend(&message, 1, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD, &request1); 
+      MPI_Issend(&num_infected_squirrels, 1, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD, &request2); 
+      MPI_Issend(&population, 1, MPI_INT, status.MPI_SOURCE, 0, MPI_COMM_WORLD, &request3);
+    }
+
+    //MPI_Irecv(&month_changed, 1, MPI_INT, 17, 1, MPI_COMM_WORLD, &request);
+    if(message == 2)
     {
       month++;
-      printf("Infection level in cell %i for month %i: %f \n", rank, month, num_infected_squirrels);
-      printf("Population influx in cell %i for month %i: %f \n", rank, month, population);
       infection_month_number = month%2;
       population_month_number = month%3;
+
       infection_level [(infection_month_number)] = 0;
       population_in_flux [(population_month_number)] = 0;
+
+      num_infected_squirrels = 0;
+      for (int i = 0; i < 2; i++)
+      {
+        num_infected_squirrels +=  infection_level [i];
+      }
+
+      population = 0;
+      for (int i = 0; i < 3; i++)
+      {
+        population +=  population_in_flux [i];
+      }
+
+      printf("Cell %i: Popinflux: %i Infection Num: %i \n", rank, population, num_infected_squirrels);
     }
 
-    if (healthy == 0)
+      //MPI_Irecv(&terminate, 1, MPI_INT, parentId, 1, MPI_COMM_WORLD, &request);
+      //printf("Received terminate  %i from rank %i \n", terminate, parentId);
+    if (message == -3) 
     {
-      infection_level [(infection_month_number)] += 1;
-    }
-    population_in_flux [(population_month_number)] += 1;
-
-    num_infected_squirrels = 0.0;
-    for (int i = 0; i < 2; i++)
-    {
-      num_infected_squirrels +=  infection_level [i];
+       printf("Cell received poison pill on rank %i. \n", rank);
+       workerStatus=workerSleep();
     }
 
-    population = 0.0;
-    for (int i = 0; i < 3; i++)
-    {
-      population +=  population_in_flux [i];
-    }
-    population -= 1; //Squirrel doesn't copulate with itself
-
-//printf("popinflux %f in cell: %i \n",population, rank);
-//printf("infection_level %f, population_in_flux %f\n", infection_level [(infection_month_number)], population_in_flux [0], status.MPI_SOURCE);
-
-    // Send information back to the squirrel.
-    MPI_Ssend(&num_infected_squirrels, 1, MPI_FLOAT, status.MPI_SOURCE, 0, MPI_COMM_WORLD); 
-    MPI_Ssend(&population, 1, MPI_FLOAT, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
-
-
-
-    //MPI_Irecv(&terminate, 1, MPI_INT, parentId, 1, MPI_COMM_WORLD, &request);
-    //printf("Received terminate  %i from rank %i \n", terminate, parentId);
-    if (terminate) workerStatus=workerSleep();
   }
 
-  MPI_Wait(&request, MPI_STATUS_IGNORE);
+  //MPI_Wait(&request, MPI_STATUS_IGNORE);
 
       //shouldWorkerStop();
   //workerStatus=workerSleep(); // Will sleep until a new task or shutdown
