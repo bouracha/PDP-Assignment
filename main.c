@@ -56,7 +56,7 @@ int main(int argc, char * argv[])
     }
 
   int masterStatus = 1;
-  while (masterStatus)
+  while (masterStatus) //exits when shut down pool is called
   {
     masterStatus = masterPoll();
   }

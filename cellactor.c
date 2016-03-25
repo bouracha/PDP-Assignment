@@ -100,6 +100,7 @@ void cellcode() {
       //printf("Received terminate  %i from rank %i \n", terminate, parentId);
     if (message == -3) 
     {
+       shutdownPool();
        workerStatus=workerSleep();
     }
 

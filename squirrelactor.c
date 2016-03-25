@@ -113,8 +113,7 @@ while (workerStatus)
       stepnumber++;
       stepnumber = stepnumber%50;
     }
-  printf("Worker is going to sleep\n");
+  //printf("Workerrank %i is going to sleep\n", rank);
   workerStatus=workerSleep(); // Will sleep until a new task or shutdown
-  printf("Worker has woken up again\n");
 } 
 }

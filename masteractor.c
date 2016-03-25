@@ -20,7 +20,7 @@ void squirrel_master(long * seed)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
       int flag;
-      int max_pop = 40;
+      int max_pop = 20;
  int terminate = 0;
   MPI_Request request1;
 
@@ -28,7 +28,7 @@ void squirrel_master(long * seed)
       int squirrel_health;
 
     int healthysquirrels = 0;
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 5; i++)
     {
       int healthy = 1;
       float x, y = 0;
@@ -39,7 +39,7 @@ void squirrel_master(long * seed)
     }
 
     int diseasedsquirrels = 0;
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < 0; i++)
     {
       int healthy = 0;
       float x, y = 0;
@@ -72,7 +72,7 @@ while (workerStatus)
         int healthy = 1;
         InitialiseSquirrel(x, y, seed, healthy);
         healthysquirrels++;
-        printf("\nSquirrel been BORN on process %d now there's %d squirrels\n", status.MPI_SOURCE, (healthysquirrels+diseasedsquirrels));
+        printf("\nSquirrel been BORN from process %d now there's %d squirrels\n", status.MPI_SOURCE, (healthysquirrels+diseasedsquirrels));
       }
       if (squirrel_health == 0)
       {
@@ -83,23 +83,31 @@ while (workerStatus)
       //MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
       //if (flag) MPI_Recv(&terminate, 1, MPI_INT, 17, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
+      int shouldTerminate = 0;
+      shouldTerminate = shouldWorkerStop();
+printf("shouldTerminate  = %i", shouldTerminate );
       int Num_squirrels = 0;
       Num_squirrels = healthysquirrels + diseasedsquirrels;
-      if (Num_squirrels <= 0 || Num_squirrels >= max_pop || terminate == -3) 
+      if (Num_squirrels <= 0 || Num_squirrels >= max_pop || shouldTerminate == 1) 
       {
         if(Num_squirrels == 0) printf("\n\nAll Squirrels have died, exiting program.\n\n");
         if(Num_squirrels >= max_pop) printf("\n\nToo many squirrels for environment.\n\n");
+        if(shouldTerminate == 1) printf("\n\nSimulation time complete.\n\n");
         int poisonedpill = -3;
         //MPI_Bcast(&poisonedpill, 1, MPI_INT, 0, MPI_COMM_WORLD);
         for (int i = 2; i < (19+Num_squirrels); i++)
         {
-          MPI_Issend(&poisonedpill, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &request1);
+          if (i != 18)MPI_Ssend(&poisonedpill, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+          printf("rank: %i has been terminated\n", i);
         }
-        terminate = -3;
+
+        shouldTerminate = 1;
       }
 
-      if (terminate == -3) break;
+      if (shouldTerminate) break;
     }
+
+  printf("rank: %i has been terminated\n", rank);
   workerStatus=workerSleep();
 }
 }
@@ -112,7 +120,7 @@ void InitialiseSquirrel(float  x, float  y, long * seed, int healthy)
 
   int workerPid = startWorkerProcess();
 
-  //printf("Worker with workerid %i has made a squirrel_health at position: %f, %f\n", workerPid, x, y);
+  printf("Worker with workerid %i has made a squirrel_health at position: %f, %f\n", workerPid, x, y);
 
   /* Master sends information on new squirrel_health to squirrel_health worker code */
   float position [2] = {x, y};
