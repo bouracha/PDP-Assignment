@@ -8,8 +8,13 @@
 #include "ran2.h"
 #include "squirrel-functions.h"
 
+#define tag_healthy 1
+
 void clockActor()
 {
+  //Initialise MPI variables
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Request request1;
   MPI_Request request2;
   MPI_Status status;
@@ -17,14 +22,15 @@ void clockActor()
   int count = 1;
   int terminate = 0;
   int month_changed = 2;
-int shouldbreak = 0;
+
+  int tag_message = 1;
 
   int flag = 0;
 
-  int parentId; 
+  int parentId;
   parentId = getCommandData();
 
-  int workerStatus = 1;	
+  int workerStatus = 1;
   while(count <= months)
   {
     //function that delays before moving on. we have set it to 2 seconds
@@ -32,32 +38,24 @@ int shouldbreak = 0;
     sleep(1);
 
     printf("\nSending monthly notice all cells \t Month %i\n\n", count);
-
     //MPI_Bcast(&month_changed, 1, MPI_INT, 0, MPI_COMM_WORLD);
     for (int i = 2; i < 18; i++)
     {
       //printf("i %i\n", i);
-      MPI_Issend(&month_changed, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &request1);
+      MPI_Issend(&month_changed, 1, MPI_INT, i, tag_healthy, MPI_COMM_WORLD, &request1);
     }
 
-    shouldbreak = shouldWorkerStop();
 
     count++;
-      
-    if (shouldbreak)
+
+    if (shouldWorkerStop())
     {
-      printf("clock terminating\n");
       break;
     }
   }
-  
-  terminate = -3;
-  //MPI_Ssend(&terminate, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
-  shutdownPool();
 
-  printf("Shutting down pool\n");
+
   shutdownPool();
   workerStatus=workerSleep();
   workerStatus = 0;
 }
-
