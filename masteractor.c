@@ -13,6 +13,7 @@
 
 #define tag_squirrelstatus 4
 #define tag_babyposition 5
+#define tag_monthend 6
 
 void InitialiseSquirrel(float, float, long*, int);
 
@@ -66,10 +67,12 @@ void squirrel_master(long * seed)
       diseasedsquirrels++;
     }
 
-  int flag;
+  int flag1;
+  int flag2;
   int loop;
   int terminate = 0;
   int squirrel_status;
+  int monthend;
 
   int Num_squirrels = healthysquirrels+diseasedsquirrels;
 
@@ -81,19 +84,30 @@ void squirrel_master(long * seed)
         // squirrel_status resets to anything but -1, 0 or 1
         // as these values have meaning in the code.
         squirrel_status = 10;
-        flag = 0;
+        monthend = 0;
+        flag1 = 0;
+        flag2 = 0;
         loop = 1;
         // Masteractor waits in this while loop until it receives a message that a squirrel is changing
         // its status or until shouldWorkerStop returns that shutdownPool() has been issued on another actor
         do
         {
-          MPI_Iprobe (MPI_ANY_SOURCE, tag_squirrelstatus, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
-          if (flag)
+          MPI_Iprobe (MPI_ANY_SOURCE, tag_squirrelstatus, MPI_COMM_WORLD, &flag1, MPI_STATUS_IGNORE);
+          if (flag1)
           {
             // Receive a message when a squirrel is born, dies or gets infected
             MPI_Recv(&squirrel_status, 1, MPI_INT, MPI_ANY_SOURCE, tag_squirrelstatus, MPI_COMM_WORLD, &status);
             loop = 0;
           }
+
+          MPI_Iprobe (18, tag_monthend, MPI_COMM_WORLD, &flag2, MPI_STATUS_IGNORE);
+          if (flag2)
+          {
+            // Receive a message that month has ended
+            MPI_Recv(&monthend, 1, MPI_INT, 18, tag_monthend, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            loop = 0;
+          }
+
 
           if (shouldWorkerStop())
           {
@@ -127,14 +141,18 @@ void squirrel_master(long * seed)
           diseasedsquirrels++;
         }
 
-
+        if (monthend)
+        {
+          printf("\nNumber of Squirrels = %i\n", Num_squirrels);
+          printf("%i Healthy; %i Infected\n\n", healthysquirrels, diseasedsquirrels);        monthend = 0;
+        }
 
         Num_squirrels = healthysquirrels + diseasedsquirrels;
-        if (Num_squirrels <= 0 || Num_squirrels >= max_pop)
+        if (Num_squirrels <= 0 || Num_squirrels >= max_pop || terminate == 1)
         {
           if(Num_squirrels == 0) printf("\n\nALL SQUIRRELS HAVE DIED FROM INFECTION!\n\n");
-          if(Num_squirrels >= max_pop) printf("\n\nTOO MANY SQUIRRELS FOR THE ENVIRONMENT.\n\n");
-          if(terminate == 1) printf("\n\nSIMULATION TIME COMPLETE\n\n");
+          if(Num_squirrels >= max_pop) printf("\n\nTOO MANY SQUIRRELS FOR THE ENVIRONMENT (%i)\n\n", Num_squirrels);
+          if (terminate) printf("\n\nSIMULATION TIME COMPLETE: \nNumber of Squirrels = %i \n %i Healthy; %i Infected\n\n\n", Num_squirrels, healthysquirrels, diseasedsquirrels);
 
           shutdownPool();
           terminate = 1;

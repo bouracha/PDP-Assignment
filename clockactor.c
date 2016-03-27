@@ -9,6 +9,7 @@
 #include "squirrel-functions.h"
 
 #define tag_healthy 1
+#define tag_monthend 6
 
 void clockActor()
 {
@@ -18,6 +19,7 @@ void clockActor()
   MPI_Request request1;
   MPI_Request request2;
   MPI_Status status;
+
   int months = 24;
   int count = 1;
   int terminate = 0;
@@ -33,25 +35,27 @@ void clockActor()
   int workerStatus = 1;
   while(count <= months)
   {
-    //function that delays before moving on. we have set it to 2 seconds
-    //this allows the processors to move the squirrels for 2 seconds before resseting
-    sleep(1);
 
-    printf("\nSending monthly notice all cells \t Month %i\n\n", count);
+    //sleep delays for the given time
+    sleep(5);
+
+    printf("\n################\n");
+    printf("MONTH %i\n", count); //Beginning of month
+    printf("################\n");
+
+    MPI_Issend(&month_changed, 1, MPI_INT, parentId, tag_monthend, MPI_COMM_WORLD, &request1);
     //MPI_Bcast(&month_changed, 1, MPI_INT, 0, MPI_COMM_WORLD);
     for (int i = 2; i < 18; i++)
     {
-      //printf("i %i\n", i);
-      MPI_Issend(&month_changed, 1, MPI_INT, i, tag_healthy, MPI_COMM_WORLD, &request1);
+      MPI_Issend(&month_changed, 1, MPI_INT, i, tag_healthy, MPI_COMM_WORLD, &request2);
     }
-
-
-    count++;
 
     if (shouldWorkerStop())
     {
       break;
     }
+
+    count++;
   }
 
 

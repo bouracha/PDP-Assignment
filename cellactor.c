@@ -115,7 +115,7 @@ void cellcode() {
         population +=  population_in_flux [i];
       }
 
-      printf("Cell %i: Popinflux: %i Infection Num: %i \n", rank, population, num_infected_squirrels);
+      printf("Cell %i: Popinflux: %i Infection Num: %i \n", rank-1, population, num_infected_squirrels);
     }
 
     if (terminate) break;
